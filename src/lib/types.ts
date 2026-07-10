@@ -12,6 +12,7 @@ export interface ExtractedField {
 // The exact field schema from the MVP spec (§10).
 export const FIELD_KEYS = [
   "institutionName",
+  "institutionAddress",
   "organizingBody",
   "eventTitle",
   "eventType",
@@ -35,6 +36,7 @@ export type Fields = Record<FieldKey, ExtractedField>;
 
 export const FIELD_LABELS: Record<FieldKey, string> = {
   institutionName: "Institution name",
+  institutionAddress: "Institution address",
   organizingBody: "Department / club / organizing body",
   eventTitle: "Event title",
   eventType: "Event type",
@@ -70,6 +72,15 @@ export interface ParsedDoc {
   text: string;
   status: "ok" | "partial" | "failed";
   note: string; // user-facing note, e.g. "read via OCR"
+}
+
+// An uploaded evidence file, kept in memory for the whole session so that
+// going back a step never loses uploads. `parsed` caches the extracted text
+// so re-processing doesn't repeat slow OCR.
+export interface UploadFile {
+  file: File;
+  kind: DocKind;
+  parsed?: ParsedDoc;
 }
 
 // A photo kept in-session for the annexure.

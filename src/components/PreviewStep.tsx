@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { PhotoItem, Report } from "@/lib/types";
+import type { FieldKey, Fields, PhotoItem, Report } from "@/lib/types";
 import { exportDocx, downloadBlob } from "@/lib/exportDocx";
 import { exportPdf } from "@/lib/exportPdf";
 
@@ -19,14 +19,17 @@ function AutoTextarea({
   value,
   onChange,
   className,
+  placeholder,
 }: {
   value: string;
   onChange: (v: string) => void;
   className?: string;
+  placeholder?: string;
 }) {
   return (
     <textarea
       value={value}
+      placeholder={placeholder}
       onChange={(e) => {
         onChange(e.target.value);
         e.target.style.height = "auto";
@@ -46,6 +49,8 @@ function AutoTextarea({
 export default function PreviewStep({
   report,
   setReport,
+  fields,
+  setFields,
   photos,
   setPhotos,
   busy,
@@ -55,6 +60,8 @@ export default function PreviewStep({
 }: {
   report: Report;
   setReport: (r: Report) => void;
+  fields: Fields;
+  setFields: (f: Fields) => void;
   photos: PhotoItem[];
   setPhotos: (p: PhotoItem[]) => void;
   busy: boolean;
@@ -76,15 +83,26 @@ export default function PreviewStep({
     setReport({ ...report, sections });
   };
 
+  const setField = (key: FieldKey, value: string) => {
+    setFields({
+      ...fields,
+      [key]: { value, confidence: value.trim() ? ("high" as const) : ("missing" as const) },
+    });
+  };
+  const institution = {
+    name: fields.institutionName.value,
+    address: fields.institutionAddress.value,
+  };
+
   const doExport = async (kind: "docx" | "pdf") => {
     setExportError("");
     setExporting(kind);
     try {
       const filename = slugify(report.title);
       if (kind === "docx") {
-        downloadBlob(await exportDocx(report, photos), `${filename}.docx`);
+        downloadBlob(await exportDocx(report, photos, institution), `${filename}.docx`);
       } else {
-        downloadBlob(exportPdf(report, photos), `${filename}.pdf`);
+        downloadBlob(exportPdf(report, photos, institution), `${filename}.pdf`);
       }
       setExported(true);
     } catch {
@@ -133,6 +151,20 @@ export default function PreviewStep({
 
       {/* Document-style preview */}
       <div className="rounded-xl border border-slate-300 bg-white px-8 py-10 shadow-sm sm:px-12">
+        {/* Institution letterhead: name large + address smaller, both centred */}
+        <AutoTextarea
+          value={institution.name}
+          onChange={(v) => setField("institutionName", v)}
+          placeholder="Name of Institution"
+          className="text-center font-serif text-2xl font-bold uppercase tracking-wide text-slate-900"
+        />
+        <AutoTextarea
+          value={institution.address}
+          onChange={(v) => setField("institutionAddress", v)}
+          placeholder="Address of institution"
+          className="text-center font-serif text-sm text-slate-700"
+        />
+        <hr className="my-4 border-slate-300" />
         <AutoTextarea
           value={report.title}
           onChange={(v) => setReport({ ...report, title: v })}

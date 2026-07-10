@@ -19,14 +19,48 @@ function dataUrlToUint8(dataUrl: string): Uint8Array {
   return out;
 }
 
-export async function exportDocx(report: Report, photos: PhotoItem[]): Promise<Blob> {
+const FONT = "Times New Roman";
+const BODY_SIZE = 24; // 12pt in half-points — body and headings share this size
+
+export interface Institution {
+  name: string;
+  address: string;
+}
+
+export async function exportDocx(
+  report: Report,
+  photos: PhotoItem[],
+  institution?: Institution
+): Promise<Blob> {
   const children: Paragraph[] = [];
+
+  // Letterhead: institution name (large, centred) then address (smaller, centred).
+  if (institution?.name.trim()) {
+    children.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 60 },
+        children: [
+          new TextRun({ text: institution.name.trim(), bold: true, size: 32, font: FONT }),
+        ],
+      })
+    );
+  }
+  if (institution?.address.trim()) {
+    children.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 240 },
+        children: [new TextRun({ text: institution.address.trim(), size: 22, font: FONT })],
+      })
+    );
+  }
 
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: 300 },
-      children: [new TextRun({ text: report.title, bold: true, size: 32 })],
+      children: [new TextRun({ text: report.title, bold: true, size: 28, font: FONT })],
     })
   );
 
@@ -35,7 +69,9 @@ export async function exportDocx(report: Report, photos: PhotoItem[]): Promise<B
       new Paragraph({
         heading: HeadingLevel.HEADING_2,
         spacing: { before: 240, after: 120 },
-        children: [new TextRun({ text: section.heading, bold: true, size: 26, color: "1F3864" })],
+        children: [
+          new TextRun({ text: section.heading, bold: true, size: BODY_SIZE, font: FONT, color: "000000" }),
+        ],
       })
     );
     for (const para of section.body.split(/\n\s*\n/)) {
@@ -45,7 +81,7 @@ export async function exportDocx(report: Report, photos: PhotoItem[]): Promise<B
         new Paragraph({
           alignment: AlignmentType.JUSTIFIED,
           spacing: { after: 160, line: 320 },
-          children: [new TextRun({ text: clean, size: 24 })],
+          children: [new TextRun({ text: clean, size: BODY_SIZE, font: FONT })],
         })
       );
     }
@@ -57,7 +93,9 @@ export async function exportDocx(report: Report, photos: PhotoItem[]): Promise<B
         heading: HeadingLevel.HEADING_2,
         pageBreakBefore: true,
         spacing: { after: 200 },
-        children: [new TextRun({ text: "Photo Annexure", bold: true, size: 26, color: "1F3864" })],
+        children: [
+          new TextRun({ text: "Photo Annexure", bold: true, size: BODY_SIZE, font: FONT, color: "000000" }),
+        ],
       })
     );
     for (const photo of photos) {
@@ -82,7 +120,7 @@ export async function exportDocx(report: Report, photos: PhotoItem[]): Promise<B
           alignment: AlignmentType.CENTER,
           spacing: { after: 160 },
           children: [
-            new TextRun({ text: photo.caption || photo.name, italics: true, size: 20 }),
+            new TextRun({ text: photo.caption || photo.name, italics: true, size: 20, font: FONT }),
           ],
         })
       );
@@ -90,6 +128,11 @@ export async function exportDocx(report: Report, photos: PhotoItem[]): Promise<B
   }
 
   const doc = new Document({
+    styles: {
+      default: {
+        document: { run: { font: FONT, size: BODY_SIZE } },
+      },
+    },
     sections: [{ properties: {}, children }],
   });
   return Packer.toBlob(doc);

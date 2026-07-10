@@ -8,7 +8,12 @@ const PAGE_H = 297;
 const MARGIN = 20;
 const CONTENT_W = PAGE_W - MARGIN * 2;
 
-export function exportPdf(report: Report, photos: PhotoItem[]): Blob {
+export interface Institution {
+  name: string;
+  address: string;
+}
+
+export function exportPdf(report: Report, photos: PhotoItem[], institution?: Institution): Blob {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   let y = MARGIN;
 
@@ -19,9 +24,32 @@ export function exportPdf(report: Report, photos: PhotoItem[]): Blob {
     }
   };
 
+  // Letterhead: institution name (large, centred) then address (smaller, centred).
+  if (institution?.name.trim()) {
+    doc.setFont("times", "bold");
+    doc.setFontSize(16);
+    const nameLines: string[] = doc.splitTextToSize(institution.name.trim(), CONTENT_W);
+    for (const line of nameLines) {
+      ensureRoom(8);
+      doc.text(line, PAGE_W / 2, y, { align: "center" });
+      y += 8;
+    }
+  }
+  if (institution?.address.trim()) {
+    doc.setFont("times", "normal");
+    doc.setFontSize(11);
+    const addrLines: string[] = doc.splitTextToSize(institution.address.trim(), CONTENT_W);
+    for (const line of addrLines) {
+      ensureRoom(6);
+      doc.text(line, PAGE_W / 2, y, { align: "center" });
+      y += 6;
+    }
+    y += 4;
+  }
+
   // Title
   doc.setFont("times", "bold");
-  doc.setFontSize(16);
+  doc.setFontSize(14);
   const titleLines: string[] = doc.splitTextToSize(report.title, CONTENT_W);
   for (const line of titleLines) {
     ensureRoom(8);
@@ -30,16 +58,16 @@ export function exportPdf(report: Report, photos: PhotoItem[]): Blob {
   }
   y += 4;
 
-  // Sections
+  // Sections — body is Times 12; headings are the same size, bold.
   for (const section of report.sections) {
     ensureRoom(14);
     doc.setFont("times", "bold");
-    doc.setFontSize(13);
+    doc.setFontSize(12);
     doc.text(section.heading, MARGIN, y);
     y += 7;
 
     doc.setFont("times", "normal");
-    doc.setFontSize(11.5);
+    doc.setFontSize(12);
     for (const para of section.body.split(/\n\s*\n/)) {
       const clean = para.trim();
       if (!clean) continue;
@@ -59,7 +87,7 @@ export function exportPdf(report: Report, photos: PhotoItem[]): Blob {
     doc.addPage();
     y = MARGIN;
     doc.setFont("times", "bold");
-    doc.setFontSize(13);
+    doc.setFontSize(12);
     doc.text("Photo Annexure", MARGIN, y);
     y += 10;
 

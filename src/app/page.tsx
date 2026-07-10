@@ -10,6 +10,7 @@ import {
   type PhotoItem,
   type Report,
   type TemplateStructure,
+  type UploadFile,
 } from "@/lib/types";
 import { disposeOcrWorker } from "@/lib/parse";
 import ModeStep from "@/components/ModeStep";
@@ -39,6 +40,10 @@ export default function Home() {
   const [step, setStep] = useState<Step>("mode");
   const [mode, setMode] = useState<Mode>("quick");
   const [docs, setDocs] = useState<ParsedDoc[]>([]);
+  // Uploads live here (not inside the upload step) so going back and forth
+  // between steps never loses them; only "Clear session" or closing the tab does.
+  const [files, setFiles] = useState<UploadFile[]>([]);
+  const [templateDoc, setTemplateDoc] = useState<ParsedDoc | null>(null);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [fields, setFields] = useState<Fields>(emptyFields);
   const [templateStructure, setTemplateStructure] = useState<TemplateStructure | null>(null);
@@ -84,6 +89,8 @@ export default function Home() {
     setStep("mode");
     setMode("quick");
     setDocs([]);
+    setFiles([]);
+    setTemplateDoc(null);
     setPhotos([]);
     setFields(emptyFields());
     setTemplateStructure(null);
@@ -197,6 +204,12 @@ export default function Home() {
         <UploadStep
           mode={mode}
           busy={busy !== null}
+          files={files}
+          setFiles={setFiles}
+          templateDoc={templateDoc}
+          setTemplateDoc={setTemplateDoc}
+          templateStructure={templateStructure}
+          setTemplateStructure={setTemplateStructure}
           photos={photos}
           setPhotos={setPhotos}
           setBusy={setBusy}
@@ -228,6 +241,8 @@ export default function Home() {
         <PreviewStep
           report={report}
           setReport={setReport}
+          fields={fields}
+          setFields={setFields}
           photos={photos}
           setPhotos={setPhotos}
           busy={busy !== null}
@@ -243,6 +258,17 @@ export default function Home() {
           read inside your browser; only the extracted text is sent for AI processing and is not
           retained. Draft work lives only in this browser tab — export your report before closing,
           and use “Clear session” when you are done.
+        </p>
+        <p className="mt-3">
+          Created by{" "}
+          <a
+            href="https://github.com/ourbee"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-indigo-600 underline hover:text-indigo-800"
+          >
+            Ritwik Balo
+          </a>
         </p>
       </footer>
     </main>

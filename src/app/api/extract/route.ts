@@ -30,7 +30,7 @@ Return ONLY a JSON object of this exact shape:
   } or null if no template document was provided
 }
 
-Field keys (use all of them): institutionName, organizingBody, eventTitle, eventType, date, time, venue, coordinator, resourcePerson, studentCount, facultyCount, totalParticipants, objective, highlights, outcome, remarks.
+Field keys (use all of them): institutionName, institutionAddress, organizingBody, eventTitle, eventType, date, time, venue, coordinator, resourcePerson, studentCount, facultyCount, totalParticipants, objective, highlights, outcome, remarks.
 
 Rules:
 - Extract only what the documents actually say. Never invent details.
@@ -39,7 +39,25 @@ Rules:
 - studentCount / facultyCount / totalParticipants: plain numbers as strings (e.g. "85"). For attendance lists, count entries if a stated total is absent, and mark confidence "medium" or "low".
 - highlights / objective / outcome: 1-3 short sentences each, drawn from the documents.
 - OCR text may be noisy; read past obvious OCR errors but lower confidence accordingly.
+- institutionAddress: the institution's postal address / locality line as printed on the letterhead or notice (e.g. "Sevoke Road, Siliguri, West Bengal").
 - For a TEMPLATE document, list its section headings in order in templateStructure.sections (max 12), detect whether it ends with a signature/footer block, and set detection to "partial" if the structure is only partly clear.`;
+
+const STRUCTURE_SYSTEM_PROMPT = `You read the text of a sample/template academic event report from an Indian college and detect its structure.
+
+Return ONLY a JSON object of this exact shape:
+{
+  "templateStructure": {
+    "sections": ["<section heading in order>", ...],
+    "hasSignatureBlock": true/false,
+    "detection": "full" | "partial" | "failed"
+  }
+}
+
+Rules:
+- List the report's section headings in reading order (max 12), written with sensible capitalisation.
+- Ignore letterhead lines (institution name/address), the report title itself, dates, page numbers and photo captions — only structural section headings.
+- hasSignatureBlock: true if the document ends with signature lines (e.g. Coordinator / Principal / IQAC).
+- Set detection to "partial" if the headings are only partly clear (e.g. noisy OCR), or "failed" with an empty sections list if no structure is recognisable.`;
 
 function sanitizeFields(raw: unknown): Fields {
   const out = emptyFields();
@@ -76,7 +94,10 @@ function sanitizeTemplate(raw: unknown): TemplateStructure | null {
 }
 
 export async function POST(req: NextRequest) {
-  let body: { docs?: { name?: string; kind?: string; text?: string }[] };
+  let body: {
+    docs?: { name?: string; kind?: string; text?: string }[];
+    structureOnly?: boolean;
+  };
   try {
     body = await req.json();
   } catch {
@@ -97,6 +118,21 @@ export async function POST(req: NextRequest) {
       { error: "No readable text was found in the uploaded files." },
       { status: 400 }
     );
+  }
+
+  // Structure-only mode: detect the template's section headings right after
+  // upload, so the user can confirm/edit them before anything else happens.
+  if (body.structureOnly) {
+    const tpl = docs.find((d) => d.kind === "template") ?? docs[0];
+    const prompt = `=== TEMPLATE / SAMPLE REPORT — ${tpl.name} ===\n${trimHeadTail(tpl.text, TEMPLATE_CHARS)}\n\nDetect the template structure now.`;
+    try {
+      const raw = await groqJson(STRUCTURE_SYSTEM_PROMPT, prompt, 800);
+      return NextResponse.json({ templateStructure: sanitizeTemplate(raw.templateStructure) });
+    } catch (e) {
+      const err =
+        e instanceof GroqError ? e : new GroqError("Template reading failed. Please try again.");
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
   }
 
   // Budget: template gets its own slice; the rest share the remainder.
