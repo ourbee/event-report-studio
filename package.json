@@ -1,0 +1,33 @@
+{
+  "name": "event-report-studio",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "predev": "node scripts/copy-pdf-worker.mjs",
+    "dev": "next dev",
+    "prebuild": "node scripts/copy-pdf-worker.mjs",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "docx": "^9.7.1",
+    "jspdf": "^4.2.1",
+    "mammoth": "^1.9.0",
+    "next": "16.2.10",
+    "pdfjs-dist": "^4.10.38",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "tesseract.js": "^6.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
