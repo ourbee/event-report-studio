@@ -4,6 +4,8 @@ A no-login, privacy-first web app for academic institutions: upload event files
 (notice, flyer, attendance sheet, photos), review the AI-extracted details, and
 export a formal event report as an editable Word document and PDF.
 
+Live at https://event-report-studio.vercel.app
+
 Built per `mvp-specification.md` (Academic Event Report Generator MVP).
 
 ## How it works
