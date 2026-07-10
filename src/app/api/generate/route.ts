@@ -23,7 +23,8 @@ Return ONLY a JSON object of this exact shape:
 
 Rules:
 - Use EXACTLY the section headings given, in the given order. Do not add, drop, rename, or reorder sections.
-- Formal, clear, institutional tone. Third person. No bullet points unless a section clearly calls for a short list.
+- Formal, clear, institutional tone. Third person. Write in the SIMPLE PAST TENSE throughout — the event has already taken place.
+- No bullet points unless a section clearly calls for a short list.
 - Use only the details provided. If a detail is missing, write around it gracefully — NEVER invent names, numbers, dates, or quotes.
 - Each section: 2-6 sentences (participation/details sections may be shorter).
 - The title should name the event and, where available, the organizing body and date.
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest) {
   let body: {
     fields?: Record<string, { value?: string }>;
     sections?: string[];
+    layout?: string;
     photoCaptions?: string[];
     instruction?: string;
   };
@@ -70,6 +72,9 @@ export async function POST(req: NextRequest) {
     userPrompt += `\nPHOTO CAPTIONS (supporting evidence of what happened):\n- ${captions.join("\n- ")}\n`;
   }
   userPrompt += `\nREQUIRED SECTION HEADINGS, IN ORDER:\n${headings.map((h, i) => `${i + 1}. ${h}`).join("\n")}\n`;
+  if (body.layout === "table") {
+    userPrompt += `\nLAYOUT: This report is a form-style TABLE. Each "section" above is a row LABEL and its body is the VALUE cell. Keep factual rows concise — a word, phrase or single line (e.g. "Mode (Online/Offline/Hybrid)" -> "Offline", "Venue" -> the venue only). Write short paragraphs (2-5 sentences) only for narrative rows such as a concept note, objective, description or outcome. Never repeat the label inside the value.\n`;
+  }
   const instruction = String(body.instruction ?? "").slice(0, 500).trim();
   if (instruction) userPrompt += `\nADDITIONAL USER INSTRUCTION: ${instruction}\n`;
   userPrompt += "\nWrite the report now.";

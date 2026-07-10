@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   FIELD_KEYS,
   FIELD_LABELS,
@@ -43,11 +44,43 @@ export default function ReviewStep({
   onBack: () => void;
   onGenerate: () => void;
 }) {
+  const [suggesting, setSuggesting] = useState<string | null>(null);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+
   const setValue = (key: (typeof FIELD_KEYS)[number], value: string) => {
     setFields({
       ...fields,
       [key]: { value, confidence: value.trim() ? "high" : "missing" },
     });
+  };
+
+  const evidenceDocs = docs.filter((d) => d.kind !== "template" && d.text.trim());
+
+  // Ask the AI to draft a narrative field (objective, outcome, …) from the
+  // uploaded documents. The result is marked "please verify".
+  const suggest = async (key: (typeof FIELD_KEYS)[number]) => {
+    setSuggesting(key);
+    setSuggestError(null);
+    try {
+      const res = await fetch("/api/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          suggestField: FIELD_LABELS[key],
+          docs: evidenceDocs.map((d) => ({ name: d.name, kind: d.kind, text: d.text })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Suggestion failed. Please try again.");
+      setFields({
+        ...fields,
+        [key]: { value: String(data.suggestion), confidence: "medium" },
+      });
+    } catch (e) {
+      setSuggestError(e instanceof Error ? e.message : "Suggestion failed. Please try again.");
+    } finally {
+      setSuggesting(null);
+    }
   };
 
   const uncertain = FIELD_KEYS.filter(
@@ -73,6 +106,12 @@ export default function ReviewStep({
           )}
         </p>
       </div>
+
+      {suggestError && (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-xs text-rose-800">
+          {suggestError}
+        </div>
+      )}
 
       {docs.length > 0 && (
         <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -137,13 +176,31 @@ export default function ReviewStep({
                 </span>
               </div>
               {isLong ? (
-                <textarea
-                  id={key}
-                  rows={3}
-                  value={field.value}
-                  onChange={(e) => setValue(key, e.target.value)}
-                  className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
-                />
+                <>
+                  <textarea
+                    id={key}
+                    rows={3}
+                    value={field.value}
+                    onChange={(e) => setValue(key, e.target.value)}
+                    className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+                  />
+                  {evidenceDocs.length > 0 && (
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <button
+                        onClick={() => void suggest(key)}
+                        disabled={busy || suggesting !== null}
+                        className="rounded-lg border border-indigo-300 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-40"
+                      >
+                        {suggesting === key ? "Drafting…" : "✨ Suggest from uploads"}
+                      </button>
+                      {field.value.trim() && (
+                        <span className="text-[11px] text-slate-400">
+                          Suggesting replaces the current text.
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </>
               ) : (
                 <input
                   id={key}

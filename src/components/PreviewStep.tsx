@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { FieldKey, Fields, PhotoItem, Report } from "@/lib/types";
+import type { FieldKey, Fields, PhotoItem, Report, TemplateLayout } from "@/lib/types";
 import { exportDocx, downloadBlob } from "@/lib/exportDocx";
 import { exportPdf } from "@/lib/exportPdf";
 
@@ -49,6 +49,7 @@ function AutoTextarea({
 export default function PreviewStep({
   report,
   setReport,
+  layout,
   fields,
   setFields,
   photos,
@@ -60,6 +61,7 @@ export default function PreviewStep({
 }: {
   report: Report;
   setReport: (r: Report) => void;
+  layout: TemplateLayout;
   fields: Fields;
   setFields: (f: Fields) => void;
   photos: PhotoItem[];
@@ -100,9 +102,9 @@ export default function PreviewStep({
     try {
       const filename = slugify(report.title);
       if (kind === "docx") {
-        downloadBlob(await exportDocx(report, photos, institution), `${filename}.docx`);
+        downloadBlob(await exportDocx(report, photos, institution, layout), `${filename}.docx`);
       } else {
-        downloadBlob(exportPdf(report, photos, institution), `${filename}.pdf`);
+        downloadBlob(exportPdf(report, photos, institution, layout), `${filename}.pdf`);
       }
       setExported(true);
     } catch {
@@ -170,20 +172,43 @@ export default function PreviewStep({
           onChange={(v) => setReport({ ...report, title: v })}
           className="text-center font-serif text-xl font-bold text-slate-900"
         />
-        {report.sections.map((section, i) => (
-          <div key={i} className="mt-6">
-            <AutoTextarea
-              value={section.heading}
-              onChange={(v) => setHeading(i, v)}
-              className="font-serif text-base font-bold text-slate-800"
-            />
-            <AutoTextarea
-              value={section.body}
-              onChange={(v) => setSection(i, v)}
-              className="mt-1 text-justify font-serif text-[15px] leading-7 text-slate-800"
-            />
+        {layout === "table" ? (
+          <div className="mt-6 border-l border-t border-slate-400">
+            {report.sections.map((section, i) => (
+              <div key={i} className="grid grid-cols-[36%_64%]">
+                <div className="border-b border-r border-slate-400 px-3 py-2">
+                  <AutoTextarea
+                    value={section.heading}
+                    onChange={(v) => setHeading(i, v)}
+                    className="font-serif text-sm font-bold text-slate-800"
+                  />
+                </div>
+                <div className="border-b border-r border-slate-400 px-3 py-2">
+                  <AutoTextarea
+                    value={section.body}
+                    onChange={(v) => setSection(i, v)}
+                    className="font-serif text-sm leading-6 text-slate-800"
+                  />
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
+        ) : (
+          report.sections.map((section, i) => (
+            <div key={i} className="mt-6">
+              <AutoTextarea
+                value={section.heading}
+                onChange={(v) => setHeading(i, v)}
+                className="font-serif text-base font-bold text-slate-800"
+              />
+              <AutoTextarea
+                value={section.body}
+                onChange={(v) => setSection(i, v)}
+                className="mt-1 text-justify font-serif text-[15px] leading-7 text-slate-800"
+              />
+            </div>
+          ))
+        )}
 
         {photos.length > 0 && (
           <div className="mt-8 border-t border-slate-200 pt-6">

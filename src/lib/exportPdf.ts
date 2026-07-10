@@ -1,7 +1,7 @@
 // PDF export via jsPDF (client-side), with a photo annexure.
 
 import { jsPDF } from "jspdf";
-import type { PhotoItem, Report } from "./types";
+import type { PhotoItem, Report, TemplateLayout } from "./types";
 
 const PAGE_W = 210; // A4 mm
 const PAGE_H = 297;
@@ -13,7 +13,12 @@ export interface Institution {
   address: string;
 }
 
-export function exportPdf(report: Report, photos: PhotoItem[], institution?: Institution): Blob {
+export function exportPdf(
+  report: Report,
+  photos: PhotoItem[],
+  institution?: Institution,
+  layout: TemplateLayout = "narrative"
+): Blob {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   let y = MARGIN;
 
@@ -58,28 +63,63 @@ export function exportPdf(report: Report, photos: PhotoItem[], institution?: Ins
   }
   y += 4;
 
-  // Sections — body is Times 12; headings are the same size, bold.
-  for (const section of report.sections) {
-    ensureRoom(14);
-    doc.setFont("times", "bold");
-    doc.setFontSize(12);
-    doc.text(section.heading, MARGIN, y);
-    y += 7;
+  if (layout === "table") {
+    // Form-style report: bordered label/value rows.
+    const LABEL_W = CONTENT_W * 0.36;
+    const VALUE_W = CONTENT_W - LABEL_W;
+    const PAD = 2.5;
+    const LINE_H = 5.5;
 
-    doc.setFont("times", "normal");
-    doc.setFontSize(12);
-    for (const para of section.body.split(/\n\s*\n/)) {
-      const clean = para.trim();
-      if (!clean) continue;
-      const lines: string[] = doc.splitTextToSize(clean, CONTENT_W);
-      for (const line of lines) {
-        ensureRoom(6);
-        doc.text(line, MARGIN, y);
-        y += 6;
+    for (const section of report.sections) {
+      doc.setFontSize(12);
+      doc.setFont("times", "bold");
+      const labelLines: string[] = doc.splitTextToSize(section.heading, LABEL_W - PAD * 2);
+      doc.setFont("times", "normal");
+      const valueLines: string[] = section.body
+        .split(/\n/)
+        .map((p) => p.trim())
+        .filter(Boolean)
+        .flatMap((p) => doc.splitTextToSize(p, VALUE_W - PAD * 2) as string[]);
+      const rowH = Math.max(labelLines.length, valueLines.length, 1) * LINE_H + PAD * 2;
+      ensureRoom(Math.min(rowH, PAGE_H - MARGIN * 2));
+
+      doc.rect(MARGIN, y, LABEL_W, rowH);
+      doc.rect(MARGIN + LABEL_W, y, VALUE_W, rowH);
+      doc.setFont("times", "bold");
+      labelLines.forEach((line, li) => {
+        doc.text(line, MARGIN + PAD, y + PAD + 4 + li * LINE_H);
+      });
+      doc.setFont("times", "normal");
+      valueLines.forEach((line, li) => {
+        doc.text(line, MARGIN + LABEL_W + PAD, y + PAD + 4 + li * LINE_H);
+      });
+      y += rowH;
+    }
+    y += 6;
+  } else {
+    // Narrative report — body is Times 12; headings are the same size, bold.
+    for (const section of report.sections) {
+      ensureRoom(14);
+      doc.setFont("times", "bold");
+      doc.setFontSize(12);
+      doc.text(section.heading, MARGIN, y);
+      y += 7;
+
+      doc.setFont("times", "normal");
+      doc.setFontSize(12);
+      for (const para of section.body.split(/\n\s*\n/)) {
+        const clean = para.trim();
+        if (!clean) continue;
+        const lines: string[] = doc.splitTextToSize(clean, CONTENT_W);
+        for (const line of lines) {
+          ensureRoom(6);
+          doc.text(line, MARGIN, y);
+          y += 6;
+        }
+        y += 3;
       }
       y += 3;
     }
-    y += 3;
   }
 
   // Photo annexure

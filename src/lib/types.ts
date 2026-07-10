@@ -81,6 +81,7 @@ export interface UploadFile {
   file: File;
   kind: DocKind;
   parsed?: ParsedDoc;
+  facts?: string[]; // short detected facts shown under the file after upload
 }
 
 // A photo kept in-session for the annexure.
@@ -93,8 +94,13 @@ export interface PhotoItem {
 }
 
 // Template structure detected in Template Mode.
+// layout "table" = a form of label/value rows (e.g. "VENUE: …"), rendered and
+// exported as a two-column table; "narrative" = headings with paragraphs.
+export type TemplateLayout = "narrative" | "table";
+
 export interface TemplateStructure {
-  sections: string[]; // heading order to follow
+  sections: string[]; // heading (or row label) order to follow
+  layout: TemplateLayout;
   hasSignatureBlock: boolean;
   note: string; // e.g. "Template structure was only partially detected."
 }

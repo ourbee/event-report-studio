@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import {
   emptyFields,
   QUICK_MODE_SECTIONS,
@@ -94,23 +94,90 @@ function DropZone({
 }
 
 // Barebones page mock so the user can see how the detected template will be
-// laid out before proceeding.
-function TemplateSkeleton({ structure }: { structure: TemplateStructure }) {
+// laid out before proceeding. Blocks can be dragged to reorder the sections.
+function TemplateSkeleton({
+  structure,
+  onReorder,
+}: {
+  structure: TemplateStructure;
+  onReorder: (from: number, to: number) => void;
+}) {
+  const dragFrom = useRef<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
+  const isTable = structure.layout === "table";
+
+  const dragProps = (i: number) => ({
+    draggable: true,
+    onDragStart: (e: React.DragEvent) => {
+      e.stopPropagation();
+      dragFrom.current = i;
+    },
+    onDragOver: (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (dragFrom.current !== null) setOverIdx(i);
+    },
+    onDragLeave: () => setOverIdx(null),
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setOverIdx(null);
+      if (dragFrom.current !== null && dragFrom.current !== i) onReorder(dragFrom.current, i);
+      dragFrom.current = null;
+    },
+    onDragEnd: () => {
+      dragFrom.current = null;
+      setOverIdx(null);
+    },
+  });
+
   return (
     <div className="rounded-lg border border-slate-300 bg-white p-4 shadow-sm">
       <div className="mx-auto h-2.5 w-3/4 rounded bg-slate-400" title="Institution name" />
       <div className="mx-auto mt-1.5 h-1.5 w-1/2 rounded bg-slate-300" title="Institution address" />
       <div className="mx-auto mt-3 h-2 w-2/3 rounded bg-slate-300" title="Report title" />
-      {structure.sections.map((s, i) => (
-        <div key={s + i} className="mt-3">
-          <p className="truncate font-serif text-[10px] font-bold leading-tight text-slate-700">
-            {s}
-          </p>
-          <div className="mt-1 h-1 w-full rounded bg-slate-200" />
-          <div className="mt-0.5 h-1 w-11/12 rounded bg-slate-200" />
-          <div className="mt-0.5 h-1 w-4/5 rounded bg-slate-200" />
+
+      {isTable ? (
+        <div className="mt-3 border-l border-t border-slate-300">
+          {structure.sections.map((s, i) => (
+            <div
+              key={s + i}
+              {...dragProps(i)}
+              className={`grid cursor-grab grid-cols-[45%_55%] active:cursor-grabbing ${
+                overIdx === i ? "bg-indigo-100" : ""
+              }`}
+            >
+              <div className="border-b border-r border-slate-300 px-1.5 py-1">
+                <p className="truncate font-serif text-[9px] font-bold leading-tight text-slate-700">
+                  {s}
+                </p>
+              </div>
+              <div className="border-b border-r border-slate-300 px-1.5 py-1">
+                <div className="h-1 w-11/12 rounded bg-slate-200" />
+                <div className="mt-0.5 h-1 w-3/5 rounded bg-slate-200" />
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+      ) : (
+        structure.sections.map((s, i) => (
+          <div
+            key={s + i}
+            {...dragProps(i)}
+            className={`mt-3 cursor-grab rounded px-1 active:cursor-grabbing ${
+              overIdx === i ? "bg-indigo-100" : ""
+            }`}
+          >
+            <p className="truncate font-serif text-[10px] font-bold leading-tight text-slate-700">
+              {s}
+            </p>
+            <div className="mt-1 h-1 w-full rounded bg-slate-200" />
+            <div className="mt-0.5 h-1 w-11/12 rounded bg-slate-200" />
+            <div className="mt-0.5 h-1 w-4/5 rounded bg-slate-200" />
+          </div>
+        ))
+      )}
+
       {structure.hasSignatureBlock && (
         <div className="mt-4 flex items-end justify-between">
           <div>
@@ -146,7 +213,7 @@ export default function UploadStep({
   mode: Mode;
   busy: boolean;
   files: UploadFile[];
-  setFiles: (f: UploadFile[]) => void;
+  setFiles: Dispatch<SetStateAction<UploadFile[]>>;
   templateDoc: ParsedDoc | null;
   setTemplateDoc: (d: ParsedDoc | null) => void;
   templateStructure: TemplateStructure | null;
@@ -166,15 +233,56 @@ export default function UploadStep({
     return ok;
   };
 
+  // Adds files to a slot, then reads them straight away and shows the key
+  // facts each one states, so the user can confirm the app read them right.
   const addFiles = (kind: DocKind, list: File[]) => {
-    const accepted = filterByExt(list, DOC_EXTS);
-    const next = [...files];
-    for (const f of accepted) {
-      if (!next.some((x) => x.kind === kind && x.file.name === f.name && x.file.size === f.size)) {
-        next.push({ file: f, kind });
+    const accepted = filterByExt(list, DOC_EXTS).filter(
+      (f) =>
+        !files.some((x) => x.kind === kind && x.file.name === f.name && x.file.size === f.size)
+    );
+    if (accepted.length === 0) return;
+    setFiles((prev) => [...prev, ...accepted.map((file) => ({ file, kind }))]);
+    void summarizeNewFiles(kind, accepted);
+  };
+
+  const summarizeNewFiles = async (kind: DocKind, newFiles: File[]) => {
+    try {
+      const parsedList: ParsedDoc[] = [];
+      for (const f of newFiles) {
+        const doc = await parseFile(f, kind, setBusy);
+        parsedList.push(doc);
+        setFiles((prev) =>
+          prev.map((x) =>
+            x.kind === kind && x.file.name === f.name && x.file.size === f.size
+              ? { ...x, parsed: doc }
+              : x
+          )
+        );
       }
+      const readable = parsedList.filter((d) => d.text.trim());
+      if (readable.length === 0) return;
+      setBusy("Checking what the files say…");
+      const res = await fetch("/api/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          factsOnly: true,
+          docs: readable.map((d) => ({ name: d.name, kind: d.kind, text: d.text })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) return; // facts are a nicety — never block the upload on them
+      const facts = (data.facts ?? {}) as Record<string, string[]>;
+      setFiles((prev) =>
+        prev.map((x) =>
+          x.parsed && facts[x.parsed.name] ? { ...x, facts: facts[x.parsed.name] } : x
+        )
+      );
+    } catch {
+      // fact detection is best-effort only
+    } finally {
+      setBusy(null);
     }
-    setFiles(next);
   };
 
   const addPhotos = async (list: File[]) => {
@@ -210,6 +318,7 @@ export default function UploadStep({
         );
         setTemplateStructure({
           sections: [...QUICK_MODE_SECTIONS],
+          layout: "narrative",
           hasSignatureBlock: false,
           note: "Template unreadable — standard structure shown instead. Edit it to match your format.",
         });
@@ -231,6 +340,7 @@ export default function UploadStep({
       } else {
         setTemplateStructure({
           sections: [...QUICK_MODE_SECTIONS],
+          layout: "narrative",
           hasSignatureBlock: false,
           note: "No clear section headings were detected — standard structure shown instead. Edit it to match your format.",
         });
@@ -345,6 +455,13 @@ export default function UploadStep({
                 <h4 className="text-xs font-semibold text-slate-900">
                   Sections detected in your template — check and correct them
                 </h4>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  Detected format:{" "}
+                  {templateStructure.layout === "table"
+                    ? "two-column table (label and value)"
+                    : "headings with paragraphs"}
+                  . The report will be laid out the same way.
+                </p>
                 {templateStructure.note && (
                   <p className="mt-1 text-xs text-amber-700">{templateStructure.note}</p>
                 )}
@@ -406,7 +523,18 @@ export default function UploadStep({
                 <p className="mb-1 text-center text-[10px] font-medium uppercase tracking-wide text-slate-500">
                   Layout preview
                 </p>
-                <TemplateSkeleton structure={templateStructure} />
+                <TemplateSkeleton
+                  structure={templateStructure}
+                  onReorder={(from, to) => {
+                    const next = [...templateStructure.sections];
+                    const [moved] = next.splice(from, 1);
+                    next.splice(to, 0, moved);
+                    setSections(next);
+                  }}
+                />
+                <p className="mt-1 text-center text-[10px] text-slate-400">
+                  Drag the blocks to reorder sections
+                </p>
               </div>
             </div>
           )}
@@ -438,18 +566,29 @@ export default function UploadStep({
               {slotFiles.length > 0 && (
                 <ul className="mt-2 space-y-1">
                   {slotFiles.map((f) => (
-                    <li
-                      key={f.file.name + f.file.size}
-                      className="flex items-center justify-between gap-2 text-xs text-slate-700"
-                    >
-                      <span className="truncate">📎 {f.file.name}</span>
-                      <button
-                        onClick={() => removeFile(files.indexOf(f))}
-                        className="text-rose-500 hover:text-rose-700"
-                        aria-label={`Remove ${f.file.name}`}
-                      >
-                        ✕
-                      </button>
+                    <li key={f.file.name + f.file.size} className="text-xs text-slate-700">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate">📎 {f.file.name}</span>
+                        <button
+                          onClick={() => removeFile(files.indexOf(f))}
+                          className="text-rose-500 hover:text-rose-700"
+                          aria-label={`Remove ${f.file.name}`}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      {f.parsed && !f.parsed.text.trim() && (
+                        <p className="mt-0.5 pl-4 text-[11px] text-amber-700">{f.parsed.note}</p>
+                      )}
+                      {f.facts && f.facts.length > 0 && (
+                        <ul className="mt-1 space-y-0.5 rounded-lg bg-emerald-50 px-3 py-1.5">
+                          {f.facts.map((fact, fi) => (
+                            <li key={fi} className="text-[11px] text-emerald-800">
+                              ✓ {fact}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </li>
                   ))}
                 </ul>

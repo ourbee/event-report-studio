@@ -103,6 +103,7 @@ export default function Home() {
   const sections = templateStructure?.sections?.length
     ? templateStructure.sections
     : QUICK_MODE_SECTIONS;
+  const layout = (mode === "template" && templateStructure?.layout) || "narrative";
 
   const generate = useCallback(
     async (instruction?: string) => {
@@ -115,6 +116,7 @@ export default function Home() {
           body: JSON.stringify({
             fields,
             sections,
+            layout,
             photoCaptions: photos.map((p) => p.caption).filter(Boolean),
             instruction,
           }),
@@ -129,7 +131,7 @@ export default function Home() {
         setBusy(null);
       }
     },
-    [fields, sections, photos]
+    [fields, sections, layout, photos]
   );
 
   const stepIndex = STEPS.findIndex((s) => s.id === step);
@@ -241,6 +243,7 @@ export default function Home() {
         <PreviewStep
           report={report}
           setReport={setReport}
+          layout={layout}
           fields={fields}
           setFields={setFields}
           photos={photos}

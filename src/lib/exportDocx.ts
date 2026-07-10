@@ -7,9 +7,13 @@ import {
   ImageRun,
   Packer,
   Paragraph,
+  Table,
+  TableCell,
+  TableRow,
   TextRun,
+  WidthType,
 } from "docx";
-import type { PhotoItem, Report } from "./types";
+import type { PhotoItem, Report, TemplateLayout } from "./types";
 
 function dataUrlToUint8(dataUrl: string): Uint8Array {
   const base64 = dataUrl.split(",")[1] ?? "";
@@ -30,9 +34,10 @@ export interface Institution {
 export async function exportDocx(
   report: Report,
   photos: PhotoItem[],
-  institution?: Institution
+  institution?: Institution,
+  layout: TemplateLayout = "narrative"
 ): Promise<Blob> {
-  const children: Paragraph[] = [];
+  const children: (Paragraph | Table)[] = [];
 
   // Letterhead: institution name (large, centred) then address (smaller, centred).
   if (institution?.name.trim()) {
@@ -64,26 +69,71 @@ export async function exportDocx(
     })
   );
 
-  for (const section of report.sections) {
+  if (layout === "table") {
+    // Form-style report: one label/value table row per section.
     children.push(
-      new Paragraph({
-        heading: HeadingLevel.HEADING_2,
-        spacing: { before: 240, after: 120 },
-        children: [
-          new TextRun({ text: section.heading, bold: true, size: BODY_SIZE, font: FONT, color: "000000" }),
-        ],
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: report.sections.map(
+          (section) =>
+            new TableRow({
+              children: [
+                new TableCell({
+                  width: { size: 36, type: WidthType.PERCENTAGE },
+                  margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({ text: section.heading, bold: true, size: BODY_SIZE, font: FONT }),
+                      ],
+                    }),
+                  ],
+                }),
+                new TableCell({
+                  width: { size: 64, type: WidthType.PERCENTAGE },
+                  margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                  children: (() => {
+                    const paras = section.body
+                      .split(/\n/)
+                      .map((p) => p.trim())
+                      .filter(Boolean)
+                      .map(
+                        (p) =>
+                          new Paragraph({
+                            children: [new TextRun({ text: p, size: BODY_SIZE, font: FONT })],
+                          })
+                      );
+                    // a table cell must contain at least one paragraph
+                    return paras.length > 0 ? paras : [new Paragraph({ children: [] })];
+                  })(),
+                }),
+              ],
+            })
+        ),
       })
     );
-    for (const para of section.body.split(/\n\s*\n/)) {
-      const clean = para.trim();
-      if (!clean) continue;
+  } else {
+    for (const section of report.sections) {
       children.push(
         new Paragraph({
-          alignment: AlignmentType.JUSTIFIED,
-          spacing: { after: 160, line: 320 },
-          children: [new TextRun({ text: clean, size: BODY_SIZE, font: FONT })],
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 240, after: 120 },
+          children: [
+            new TextRun({ text: section.heading, bold: true, size: BODY_SIZE, font: FONT, color: "000000" }),
+          ],
         })
       );
+      for (const para of section.body.split(/\n\s*\n/)) {
+        const clean = para.trim();
+        if (!clean) continue;
+        children.push(
+          new Paragraph({
+            alignment: AlignmentType.JUSTIFIED,
+            spacing: { after: 160, line: 320 },
+            children: [new TextRun({ text: clean, size: BODY_SIZE, font: FONT })],
+          })
+        );
+      }
     }
   }
 
