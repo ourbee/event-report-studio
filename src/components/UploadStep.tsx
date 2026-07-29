@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2026 Ritwik Balo. All rights reserved.
+ * https://github.com/ourbee
+ */
+
 "use client";
 
 import { useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";

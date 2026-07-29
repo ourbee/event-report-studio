@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2026 Ritwik Balo. All rights reserved.
+ * https://github.com/ourbee
+ */
+
 // Server-side helper: call Groq chat completions with JSON output and
 // automatic model fallback (pattern reused from ClaimGuard).
 

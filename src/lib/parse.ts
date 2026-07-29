@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2026 Ritwik Balo. All rights reserved.
+ * https://github.com/ourbee
+ */
+
 // Client-side file reading. Files never leave the browser — only the
 // extracted text is sent to the API for structured extraction.
 

@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2026 Ritwik Balo. All rights reserved.
+ * https://github.com/ourbee
+ */
+
 // Model selection with automatic fallback.
 //
 // Groq retires models from time to time. Instead of hardcoding one model name,

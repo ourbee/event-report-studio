@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2026 Ritwik Balo. All rights reserved.
+ * https://github.com/ourbee
+ */
+
 // PDF export via jsPDF (client-side), with a photo annexure.
 
 import { jsPDF } from "jspdf";

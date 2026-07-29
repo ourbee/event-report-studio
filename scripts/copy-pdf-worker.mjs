@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2026 Ritwik Balo. All rights reserved.
+ * https://github.com/ourbee
+ */
+
 // Copies the pdf.js worker into /public so it is served at a stable URL
 // (/pdf.worker.min.mjs) regardless of bundler. Runs before dev and build.
 import { copyFileSync, mkdirSync, existsSync } from "node:fs";
